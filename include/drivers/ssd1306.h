@@ -5,6 +5,7 @@
 #include "hardware/i2c.h"
 
 #include "libraries/pico-ssd1306/ssd1306.h"
+#include "drivers/led.h"
 
 #define SSD1306_I2C_PORT i2c1
 
@@ -20,7 +21,9 @@
 #define SSD1306_TEXT_SCALE 1
 
 void ssd1306_init(void);
-void ssd1306_print_text(uint32_t x, uint32_t y, const char *text);
+void ssd1306_write_text(uint32_t x, uint32_t y, const char *text);
+void ssd1306_show_text(void);
 void ssd1306_clear_screen(void);
+void error_animation(const char *text);
 
 #endif // SSD1306_H

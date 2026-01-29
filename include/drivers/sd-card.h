@@ -7,6 +7,7 @@
 #include "pico/stdlib.h"
 #include "hardware/spi.h"
 #include "libraries/pico-sdcard/include/ff.h"
+#include "drivers/ssd1306.h"
 
 typedef enum
 {

@@ -16,9 +16,8 @@
 #include "network/wifi.h"
 #include "network/mqtt.h"
 
-#include "services/freertos-process.h"
+#include "services/freertos-tasks.h"
 
 void setup(void);
-void read_sensors_and_modules(void);
 
 #endif // MAIN_H

@@ -17,12 +17,12 @@ bool aht10_read(float *temperature, float *humidity)
 
     if (i2c_read_blocking(AHT10_I2C_PORT, AHT10_ADDR, data, 6, false) != 6)
     {
-        return false; // Erro na leitura dos dados
+        return false;
     }
 
     if (data[0] & 0x80)
     {
-        return false; // Sensor ainda está processando, leitura inválida
+        return false;
     }
 
     uint32_t raw_humidity = (data[1] << 12) | (data[2] << 4) | ((data[3] >> 4) & 0x0F);

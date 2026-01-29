@@ -14,6 +14,5 @@
 #define MAX_SERIAL_MESSAGE 64
 
 void ft232rl_init(void);
-void read_serial(void);
 
 #endif // FT232RL_H

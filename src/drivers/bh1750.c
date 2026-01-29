@@ -19,7 +19,7 @@ bool bh1750_read(float *lux)
 
     if (i2c_read_blocking(BH1750_I2C_PORT, BH1750_ADDR, buffer, 2, false) != 2)
     {
-        return false; // Erro na leitura dos dados
+        return false;
     }
     
     uint16_t raw = (buffer[0] << 8) | buffer[1];

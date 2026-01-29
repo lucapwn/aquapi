@@ -1,34 +1,47 @@
 #include "network/mqtt.h"
 
-static uint32_t last_time = 0;
+extern settings_t settings;
+MQTT_CLIENT_T *client = NULL;
 
-MQTT_CLIENT_T *mqtt_client_init(void)
+void mqtt_init(void)
 {
-    MQTT_CLIENT_T *client = calloc(1, sizeof(MQTT_CLIENT_T));
+    if (settings.mode != DEVICE_ONLINE_MODE)
+    {
+        return;
+    }
+    
+    client = calloc(1, sizeof(MQTT_CLIENT_T));
 
     if (!client)
     {
-        printf("Failed to allocate memory for the MQTT client.\n");
-        return NULL;
+        error_animation("Error: MQTT.");
+        return;
     }
 
-    return client;
+    client->connected = false;
+    client->connecting = false;
+
+    mqtt_connect();
 }
 
-static err_t connects_to_mqtt_client(MQTT_CLIENT_T *client)
+void dns_found(const char *name, const ip_addr_t *ipaddr, void *callback)
 {
-    struct mqtt_connect_client_info_t ci = { 0 };
-    ci.client_id = "Raspberry Pi Pico W";
-    return mqtt_client_connect(client->mqtt_client, &(client->remote_addr), MQTT_SERVER_PORT, mqtt_connection_callback, client, &ci);
-}
+    MQTT_CLIENT_T *c = (MQTT_CLIENT_T *)callback;
 
-static void run_dns_lookup(MQTT_CLIENT_T *client)
-{
-    printf("Running DNS lookup for %s\n", MQTT_SERVER_HOST);
-    
-    if (dns_gethostbyname(MQTT_SERVER_HOST, &(client->remote_addr), dns_found, client) == ERR_INPROGRESS)
+    if (!ipaddr)
     {
-        while (ip_addr_isany(&(client->remote_addr)))
+        error_animation("Error: DNS.");
+        return;
+    }
+
+    c->remote_addr = *ipaddr;
+}
+
+void run_dns_lookup(void)
+{
+    if (dns_gethostbyname(MQTT_SERVER_HOST, &client->remote_addr, dns_found, client) == ERR_INPROGRESS)
+    {
+        while (ip_addr_isany(&client->remote_addr))
         {
             cyw43_arch_poll();
             sleep_ms(10);
@@ -36,124 +49,125 @@ static void run_dns_lookup(MQTT_CLIENT_T *client)
     }
 }
 
-static void dns_found(const char *name, const ip_addr_t *ipaddr, void *callback_arg)
+void mqtt_connection_callback(mqtt_client_t *mqtt, void *arg, mqtt_connection_status_t status)
 {
-    MQTT_CLIENT_T *client = (MQTT_CLIENT_T*)callback_arg;
+    MQTT_CLIENT_T *c = (MQTT_CLIENT_T *)arg;
 
-    if (!ipaddr)
+    c->connecting = false;
+
+    if (status != MQTT_CONNECT_ACCEPTED)
     {
-        printf("DNS resolution failure.\n");
+        c->connected = false;
+        c->reconnects++;
+        error_animation("Error: MQTT.");
         return;
     }
 
-    client->remote_addr = *ipaddr;
-    printf("DNS resolved: %s\n", ip4addr_ntoa(ipaddr));
+    c->connected = true;
+
+    mqtt_subscription(DEVICE_MESSAGE_MQTT_TOPIC, DEVICE_MESSAGE_MQTT_QOS);
 }
 
-void create_mqtt_client(MQTT_CLIENT_T *client)
+err_t connects_to_mqtt_client(void)
 {
-    run_dns_lookup(client);
-    
-    client->mqtt_client = mqtt_client_new();
+    if (client->connecting || client->connected)
+    {
+        return ERR_OK;
+    }
+
+    struct mqtt_connect_client_info_t ci = { 0 };
+    ci.client_id = "Raspberry Pi Pico W";
+    client->connecting = true;
+
+    return mqtt_client_connect(client->mqtt_client, &client->remote_addr, MQTT_SERVER_PORT, mqtt_connection_callback, client, &ci);
+}
+
+void mqtt_connect(void)
+{
+    ssd1306_clear_screen();
+    ssd1306_write_text(0, 24, "Connecting to MQTT.");
+    ssd1306_show_text();
+
+    run_dns_lookup();
 
     if (!client->mqtt_client)
     {
-        printf("Failed to create MQTT client.\n");
-        return;
-    }
-}
-
-void start_mqtt_connection(MQTT_CLIENT_T *client)
-{
-    if (connects_to_mqtt_client(client) != ERR_OK) {
-        printf("Failed to connect to the MQTT client.\n");
-        return;
-    }
-}
-
-static void mqtt_connection_callback(mqtt_client_t *client, void *arg, mqtt_connection_status_t status)
-{
-    if (status != MQTT_CONNECT_ACCEPTED) {
-        printf("MQTT connection failed: %d\n", status);
-        return;
+        client->mqtt_client = mqtt_client_new();
     }
 
-    printf("MQTT connected.\n");
-}
-
-static void mqtt_publish_start_callback(void *arg, const char *topic, u32_t tot_len)
-{
-    printf("Message received on topic: %s\n", topic);
-}
-
-static void mqtt_publish_data_callback(void *arg, const u8_t *data, u16_t length, u8_t flags)
-{
-    if (length >= MQTT_BUFFER_SIZE)
+    if (!client->mqtt_client)
     {
-        printf("The received message is larger than the buffer.\n");
+        error_animation("Error: MQTT.");
         return;
     }
 
-    char buffer[length];
-    char message[MQTT_BUFFER_SIZE];
-
-    memset(buffer, 0, sizeof(buffer));
-    memset(message, 0, sizeof(message));
-    memcpy(buffer, data, sizeof(buffer));
-
-    buffer[length] = '\0';
-    message[MQTT_BUFFER_SIZE - 1] = '\0';
-
-    snprintf(message, sizeof(message), "Message: %s", buffer);
-
-    printf("Message received: %s\n", buffer);
+    connects_to_mqtt_client();
 }
 
-void start_mqtt_subscription(MQTT_CLIENT_T *client)
+void mqtt_publish_start_callback(void *args, const char *topic, u32_t tot_len)
 {
-    mqtt_set_inpub_callback(client->mqtt_client, mqtt_publish_start_callback, mqtt_publish_data_callback, NULL);
-    err_t subscribe_return = mqtt_sub_unsub(client->mqtt_client, DEVICE_MESSAGE_MQTT_TOPIC, 2, NULL, NULL, 1);
+    MQTT_CLIENT_T *c = (MQTT_CLIENT_T *)args;
 
-    if (subscribe_return != ERR_OK)
+    memset(c->current_topic, 0, sizeof(c->current_topic));
+    strncpy(c->current_topic, topic, sizeof(c->current_topic) - 1);
+
+    c->payload_len = 0;
+}
+
+void mqtt_publish_data_callback(void *args, const u8_t *data, u16_t length, u8_t flags)
+{
+    MQTT_CLIENT_T *c = (MQTT_CLIENT_T *)args;
+
+    if ((c->payload_len + length) >= MQTT_PAYLOAD_MAX_LEN)
     {
-        printf("Failed to subscribe to the \"%s\" topic.\n", DEVICE_MESSAGE_MQTT_TOPIC);
         return;
     }
 
-    printf("Successful subscription to the \"%s\" topic.\n", DEVICE_MESSAGE_MQTT_TOPIC);
+    memcpy(&c->payload[c->payload_len], data, length);
+    c->payload_len += length;
+
+    if (flags & MQTT_DATA_FLAG_LAST)
+    {
+        c->payload[c->payload_len] = '\0';
+
+        if (strcmp(c->current_topic, DEVICE_MESSAGE_MQTT_TOPIC) == 0)
+        {
+            load_json_settings(&settings, c->payload);
+        }
+
+        c->received++;
+    }
 }
 
-void start_mqtt_publishing(MQTT_CLIENT_T *client)
+void mqtt_subscription(const char *topic, u8_t qos)
+{
+    if (!client->connected)
+    {
+        return;
+    }
+
+    mqtt_set_inpub_callback(client->mqtt_client, mqtt_publish_start_callback, mqtt_publish_data_callback, client);
+
+    if (mqtt_sub_unsub(client->mqtt_client, topic, qos, NULL, NULL, 1) != ERR_OK)
+    {
+        error_animation("Error: MQTT.");
+    }
+}
+
+void mqtt_publishing(const char *topic, const void *payload, u16_t payload_length, u8_t qos)
 {
     cyw43_arch_poll();
 
-    if (!mqtt_client_is_connected(client->mqtt_client))
+    if (!client->connected)
     {
-        printf("Trying to connect to the MQTT client.\n");
-        connects_to_mqtt_client(client);
+        return;
     }
 
-    uint32_t now = to_ms_since_boot(get_absolute_time());
-
-    if (now - last_time >= PUBLISH_DELAY_MS)
+    if (mqtt_publish(client->mqtt_client, topic, payload, payload_length, qos, 0, NULL, client) != ERR_OK)
     {
-        char json[MQTT_BUFFER_SIZE];
-    
-        snprintf(json, sizeof(json),
-            "{"
-                "\"message\": \"Message from Raspberry Pi Pico W.\""
-            "}"
-        );
-
-        err_t publish_return = mqtt_publish(client->mqtt_client, SERVER_MESSAGE_MQTT_TOPIC, json, strlen(json), 0, 0, NULL, client);
-
-        if (publish_return != ERR_OK)
-        {
-            printf("Failed to publish to the \"%s\" topic.\n", SERVER_MESSAGE_MQTT_TOPIC);
-            return;
-        }
-
-        printf("Successful publishing to the \"%s\" topic.\n%s\n", SERVER_MESSAGE_MQTT_TOPIC, json);
-        last_time = now;
+        return;
     }
+
+    client->published++;
+    led_success_animation();
 }

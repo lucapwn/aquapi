@@ -1,5 +1,7 @@
 #include "drivers/relay.h"
 
+extern sensors_t sensors;
+
 void relay_init(void)
 {
     gpio_init(RELAY_PIN);
@@ -9,12 +11,12 @@ void relay_init(void)
 
 void relay_on(void)
 {
-    gpio_put(RELAY_PIN, 1);
-    printf("Relay [ON]\n");
+    sensors.relay = true;
+    gpio_put(RELAY_PIN, sensors.relay);
 }
 
 void relay_off(void)
 {
-    gpio_put(RELAY_PIN, 0);
-    printf("Relay [OFF]\n");
+    sensors.relay = false;
+    gpio_put(RELAY_PIN, sensors.relay);
 }

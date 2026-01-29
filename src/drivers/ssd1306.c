@@ -18,13 +18,25 @@ void ssd1306_init(void)
     ssd1306_clear(&display);
 }
 
-void ssd1306_print_text(uint32_t x, uint32_t y, const char *text)
+void ssd1306_write_text(uint32_t x, uint32_t y, const char *text)
 {
     ssd1306_draw_string(&display, x, y, SSD1306_TEXT_SCALE, text);
+}
+
+void ssd1306_show_text(void)
+{
     ssd1306_show(&display);
 }
 
 void ssd1306_clear_screen(void)
 {
     ssd1306_clear(&display);
+}
+
+void error_animation(const char *text)
+{
+    ssd1306_clear_screen();
+    ssd1306_write_text(0, 24, text);
+    ssd1306_show_text();
+    led_error_animation();
 }

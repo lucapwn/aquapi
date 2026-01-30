@@ -21,6 +21,5 @@ int main(int argc, char *argv[])
 {
     setup();
     freertos_tasks_init();
-
     return 0;
 }

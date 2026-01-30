@@ -275,11 +275,11 @@ void settings_process_command(const char *cmd)
     {
         if (settings_save(DEVICE_SETTINGS_FILENAME, &settings))
         {
-            uart_puts(FT232RL_UART_ID, "Settings saved.\n");
+            uart_puts(FT232RL_UART_ID, "Settings saved successfully.\n");
         }
         else
         {
-            uart_puts(FT232RL_UART_ID, "Save error.\n");
+            uart_puts(FT232RL_UART_ID, "Error saving settings.\n");
         }
 
         return;
@@ -322,7 +322,7 @@ void settings_process_command(const char *cmd)
             return;
         }
 
-        uart_puts(FT232RL_UART_ID, "OK.\n");
+        uart_puts(FT232RL_UART_ID, "Value successfully set in memory.\nDon't forget to save the information.\n");
     }
 }
 

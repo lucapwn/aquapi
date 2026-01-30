@@ -9,8 +9,8 @@
 #include "drivers/led.h"
 #include "drivers/settings.h"
 
-#define WIFI_SSID     // "YOUR_WIFI_NAME_HERE"
-#define WIFI_PASSWORD // "YOUR_WIFI_PASSWORD_HERE"
+#define WIFI_SSID     "Online.Adriana" // "YOUR_WIFI_NAME_HERE"
+#define WIFI_PASSWORD "99669942"       // "YOUR_WIFI_PASSWORD_HERE"
 
 void wifi_init(void);
 

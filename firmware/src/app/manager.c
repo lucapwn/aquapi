@@ -58,9 +58,6 @@ void vSensorsTask(void *args)
 
         xQueueSend(sensorsQueue, &sensorsValue, 0);
         vTaskDelay(pdMS_TO_TICKS(SENSORS_SLEEP_MS));
-
-        UBaseType_t watermark = uxTaskGetStackHighWaterMark(NULL);
-        printf("Free Stack (vSensorsTask): %lu words\n", watermark);
     }
 }
 
@@ -87,19 +84,13 @@ void vSettingsTask(void *args)
             uart_input[index++] = c;
         }
 
-        if (c == '\n') // Colocar LF no "Line ending" do Serial Monitor para a aplicação enviar o "\n" ao final da string
+        if (c == '\n')
         {
             uart_input[index] = '\0';
             settingsValue = false;
             xQueueSend(settingsQueue, &settingsValue, 0);
             settings_process_command(uart_input);
             index = 0;
-
-            char buffer[64];
-            UBaseType_t watermark = uxTaskGetStackHighWaterMark(NULL);
-            // printf("Free Stack (vSettingsTask): %lu words\n", watermark);
-            snprintf(buffer, sizeof(buffer), "Free Stack (vSettingsTask): %lu words\n", watermark);
-            uart_puts(FT232RL_UART_ID, buffer);
         }
     }
 }
@@ -118,10 +109,10 @@ void vPublishTask(void *args)
 
         snprintf(payload, sizeof(payload),
             "{"
-                "\"temperature\": %.2f, "
-                "\"humidity\": %.2f, "
-                "\"lux\": %.2f, "
-                "\"moisture\": %u, "
+                "\"temperature\": %.2f,"
+                "\"humidity\": %.2f,"
+                "\"lux\": %.2f,"
+                "\"moisture\": %u,"
                 "\"relay\": %u"
             "}",
             sensors.temperature,
@@ -132,9 +123,6 @@ void vPublishTask(void *args)
         );
 
         mqtt_publishing(SERVER_MESSAGE_MQTT_TOPIC, payload, strlen(payload), SERVER_MESSAGE_MQTT_QOS);
-
-        UBaseType_t watermark = uxTaskGetStackHighWaterMark(NULL);
-        printf("Free Stack (vPublishTask): %lu words\n", watermark);
     }
 }
 
@@ -192,9 +180,6 @@ void vWateringTask(void *args)
             settings_save(DEVICE_SETTINGS_FILENAME, &settings);
         }
 
-        UBaseType_t watermark = uxTaskGetStackHighWaterMark(NULL);
-        printf("Free Stack (vWateringTask): %lu words\n", watermark);
-
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(800));
     }
 }

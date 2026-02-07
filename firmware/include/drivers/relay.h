@@ -3,7 +3,6 @@
 
 #include <stdio.h>
 #include "pico/stdlib.h"
-
 #include "app/manager.h"
 
 #define RELAY_PIN 20
